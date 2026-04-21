@@ -1,139 +1,159 @@
-# order-service
+# order-service-Bestbuy
 
-This is a Fastify app that provides an API for submitting orders. It is meant to be used in conjunction with the store-front app.
+`order-service-Bestbuy` is the order backend for the CST8915 final project. It is a lightweight Fastify service for a Best Buy-inspired electronics storefront and is designed to work with the `store-front` app now, with room for later `store-admin` and order-processing integrations.
 
-It is a simple REST API that allows you to add an order to a message queue that supports the AMQP 1.0 protocol.
+## What this service does
 
-## Prerequisites
+- Accepts order submissions from the storefront.
+- Normalizes and stores orders in memory for demo use.
+- Assigns an order `id`, `status`, timestamps, and a consistent `total`.
+- Exposes simple order lookup endpoints for later admin and processing workflows.
+- Optionally forwards created orders to a RabbitMQ or Azure Service Bus queue if queue configuration is provided.
 
-- [Node.js](https://nodejs.org/en/download/)
-- [Docker](https://docs.docker.com/get-docker/)
-- [Docker Compose](https://docs.docker.com/compose/install/)
+## Current order behavior
 
+- `POST /` remains the main storefront submission endpoint.
+- Orders default to `pending` status.
+- Supported statuses are `pending`, `processing`, and `completed`.
+- The service keeps the submitted payload shape as much as possible and preserves common fields such as `customerId`, `customerName`, `items`, `total`, `status`, and `createdAt`.
+- For compatibility, the service accepts order items from `items`, `cart`, or `cart.items`, then stores the normalized result on `items`.
+- Orders are stored in memory only, which keeps the project simple for demos. Restarting the service clears the order list unless an external queue or downstream processor is used.
 
-## Message queue options
+## API overview
 
-This app can connect to either RabbitMQ or Azure Service Bus using AMQP 1.0. To connect to either of these services, you will need to provide appropriate environment variables for connecting to the message queue.
+### `POST /`
+Create a new order.
 
-### Option 1: RabbitMQ
+Example request body:
 
-To run this against RabbitMQ. A docker-compose file is provided to make this easy. This will run RabbitMQ, the RabbitMQ Management UI, and enable the `rabbitmq_amqp1_0` plugin. The plugin is necessary to connect to RabbitMQ using AMQP 1.0.
+```json
+{
+  "customerId": "CST8915-1001",
+  "customerName": "Alex Johnson",
+  "items": [
+    {
+      "productId": "BBY-LAPTOP-001",
+      "productName": "Lenovo IdeaPad 15 Laptop",
+      "quantity": 1,
+      "price": 799.99
+    },
+    {
+      "productId": "BBY-MOUSE-014",
+      "productName": "Logitech Wireless Mouse",
+      "quantity": 2,
+      "price": 29.99
+    }
+  ],
+  "total": 859.97
+}
+```
 
-To run the necessary services, clone the repo, open a terminal, and navigate to the `order-service` directory. Then run the following command:
+Returns `201 Created` with the stored order object.
+
+### `GET /orders`
+Return all submitted orders currently held in memory.
+
+### `GET /orders/:id`
+Return a single order by id.
+
+### `PATCH /orders/:id`
+Update an order status.
+
+Example request body:
+
+```json
+{
+  "status": "processing"
+}
+```
+
+### `GET /health`
+Basic health endpoint. Returns service status and app version.
+
+## Configuration
+
+The service can run with no queue configuration at all. In that mode, it accepts and stores orders in memory only.
+
+### Core runtime
+
+- `APP_VERSION`: optional application version returned by `GET /health`
+
+### Optional RabbitMQ configuration
+
+- `ORDER_QUEUE_HOSTNAME`
+- `ORDER_QUEUE_PORT`
+- `ORDER_QUEUE_USERNAME`
+- `ORDER_QUEUE_PASSWORD`
+- `ORDER_QUEUE_NAME`
+- `ORDER_QUEUE_TRANSPORT`
+- `ORDER_QUEUE_RECONNECT_LIMIT`
+
+If these values are present, newly created orders are also published to the configured queue.
+
+### Optional Azure Service Bus configuration
+
+- `USE_WORKLOAD_IDENTITY_AUTH=true`
+- `AZURE_SERVICEBUS_FULLYQUALIFIEDNAMESPACE`
+- `ORDER_QUEUE_NAME`
+
+If workload identity is enabled, created orders are sent to Azure Service Bus instead of local RabbitMQ credentials.
+
+## Local run instructions
+
+Install dependencies if you do not already have them:
+
+```bash
+npm install
+```
+
+Run the service in development mode:
+
+```bash
+npm run dev
+```
+
+Run the service in standard mode:
+
+```bash
+npm start
+```
+
+The API listens on port `3000` by default.
+
+## Build instructions
+
+If you want to build the container image locally:
+
+```bash
+docker build -t order-service-bestbuy .
+```
+
+## Docker instructions
+
+Run the API container:
+
+```bash
+docker run -p 3000:3000 --name order-service-bestbuy order-service-bestbuy
+```
+
+If you want a local RabbitMQ instance for queue-based demos, a `docker-compose.yml` file is included:
 
 ```bash
 docker compose up
 ```
 
-With the services running, open a new terminal and navigate to the `order-service` directory. Then run the following commands:
+This starts RabbitMQ with the AMQP 1.0 plugin enabled so created orders can be published to the `orders` queue when the related environment variables are configured.
 
-```bash
-cat << EOF > .env
-ORDER_QUEUE_HOSTNAME=localhost
-ORDER_QUEUE_PORT=5672
-ORDER_QUEUE_USERNAME=username
-ORDER_QUEUE_PASSWORD=password
-ORDER_QUEUE_NAME=orders
-EOF
+## Quick testing
 
-# load the environment variables
-source .env
-```
+- Use [`test-order-service.http`](./test-order-service.http) with the VS Code REST Client extension.
+- Submit a sample electronics order with `POST /`.
+- Check the stored orders with `GET /orders`.
+- Update an order status with `PATCH /orders/:id`.
+- Call `GET /health` to confirm the service is running.
 
-### Option 2: Azure Service Bus
+## Project notes
 
-To run this against Azure Service Bus, you will need to create a Service Bus namespace and a queue. You can do this using the Azure CLI. 
-
-```bash
-az group create --name <resource-group-name> --location <location>
-az servicebus namespace create --name <namespace-name> --resource-group <resource-group-name>
-az servicebus queue create --name orders --namespace-name <namespace-name> --resource-group <resource-group-name>
-```
-
-Once you have created the Service Bus namespace and queue, you will need to decide on the authentication method. You can create a shared access policy with the **Send** permission for the queue or use Microsoft Entra Workload Identity for a passwordless experience (this is the recommended approach).
-
-If you choose to use Managed Identity, you will need to assign the `Azure Service Bus Data Sender` role to the identity that is running the app, which in this case will be your account. You can do this using the Azure CLI.
-
-```bash
-PRINCIPALID=$(az ad signed-in-user show --query objectId -o tsv)
-SERVICEBUSBID=$(az servicebus namespace show --name <namespace-name> --resource-group <resource-group-name> --query id -o tsv)
-
-az role assignment create --role "Azure Service Bus Data Sender" --assignee $PRINCIPALID --scope $SERVICEBUSBID
-```
-
-Next, get the connection information for the Azure Service Bus queue and save the values to environment variables.
-
-Next, get the hostname for the Azure Service Bus queue.
-
-```bash
-HOSTNAME=$(az servicebus namespace show --name <namespace-name> --resource-group <resource-group-name> --query serviceBusEndpoint -o tsv | sed 's/https:\/\///;s/:443\///')
-```
-
-Finally, save the environment variables to a `.env` file.
-
-```bash
-cat << EOF > .env
-USE_WORKLOAD_IDENTITY_AUTH=true
-AZURE_SERVICEBUS_FULLYQUALIFIEDNAMESPACE=$HOSTNAME
-ORDER_QUEUE_NAME=orders
-EOF
-
-# load the environment variables
-source .env
-```
-
-If you choose to use a shared access policy, you can create one using the Azure CLI. Otherwise, you can skip this step and proceed to [running the app locally](#running-the-app-locally).
-
-```bash
-az servicebus queue authorization-rule create --name sender --namespace-name <namespace-name> --resource-group <resource-group-name> --queue-name orders --rights Send
-```
-
-Next, get the connection information for the Azure Service Bus queue.
-
-```bash
-HOSTNAME=$(az servicebus namespace show --name <namespace-name> --resource-group <resource-group-name> --query serviceBusEndpoint -o tsv | sed 's/https:\/\///;s/:443\///')
-
-PASSWORD=$(az servicebus queue authorization-rule keys list --namespace-name <namespace-name> --resource-group <resource-group-name> --queue-name orders --name sender --query primaryKey -o tsv)
-```
-
-Finally, save the environment variables to a `.env` file.
-
-```bash
-cat << EOF > .env
-ORDER_QUEUE_HOSTNAME=$HOSTNAME
-ORDER_QUEUE_PORT=5671
-ORDER_QUEUE_USERNAME=sender
-ORDER_QUEUE_PASSWORD="$PASSWORD"
-ORDER_QUEUE_TRANSPORT=tls
-ORDER_QUEUE_RECONNECT_LIMIT=10
-ORDER_QUEUE_NAME=orders
-EOF
-
-# load the environment variables
-source .env
-```
-
-## Running the app locally
-
-To run the app, run the following command:
-
-```bash
-npm install
-npm run dev
-```
-
-When the app is running, you should see output similar to the following:
-
-```text
-> order-service@1.0.0 dev
-> fastify start -w -l info -P app.js
-
-[1687920999327] INFO (108877 on yubuntu): Server listening at http://[::1]:3000
-[1687920999327] INFO (108877 on yubuntu): Server listening at http://127.0.0.1:3000
-```
-
-## Testing the API
-
-Using the [`test-order-service.http`](./test-order-service.http) file in the root of the repo, you can test the API. However, you will need to use VS Code and have the [REST Client](https://marketplace.visualstudio.com/items?itemName=humao.rest-client) extension installed.
-
-To view the order messages in RabbitMQ, open a browser and navigate to [http://localhost:15672](http://localhost:15672). Log in with the username and password you provided in the environment variables above. Then click on the **Queues** tab and click on your **orders** queue. After you've submitted a few orders, you should see the messages in the queue.
+- This service is intentionally lightweight and demo-friendly.
+- No database or auth layer has been added.
+- Queue publishing is optional and does not prevent local demo use when queue credentials are absent.

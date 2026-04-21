@@ -6,7 +6,7 @@ module.exports = fp(async function (fastify, opts) {
   fastify.decorate('sendMessage', function (message) {
     const body = message.toString()
     if (process.env.ORDER_QUEUE_USERNAME && process.env.ORDER_QUEUE_PASSWORD) {
-      console.log('sending message ${body} to ${process.env.ORDER_QUEUE_NAME} on ${process.env.ORDER_QUEUE_HOSTNAME} using local auth credentials')
+      console.log(`sending message ${body} to ${process.env.ORDER_QUEUE_NAME} on ${process.env.ORDER_QUEUE_HOSTNAME} using local auth credentials`)
       
       const rhea = require('rhea')
       const container = rhea.create_container()
@@ -67,7 +67,7 @@ module.exports = fp(async function (fastify, opts) {
       }
       sendMessage().catch(console.error);
     } else {
-      console.log('no credentials set for message queue. exiting.')
+      console.log('no message queue credentials set. order saved in memory only.')
       return
     }
   })

@@ -6,23 +6,44 @@
 GET  /health
 Host: localhost:3000
 
-### Send order to order service
+### Create a new electronics order
 POST /
 Host: localhost:3000
 Content-Type: application/json
 
 {
-    "customerId": "1234567890",
+    "customerId": "CST8915-1001",
+    "customerName": "Alex Johnson",
     "items": [
         {
-            "productId": 1,
+            "productId": "BBY-LAPTOP-001",
+            "productName": "Lenovo IdeaPad 15 Laptop",
             "quantity": 1,
-            "price": 10
+            "price": 799.99
         },
         {
-            "productId": 2,
+            "productId": "BBY-MOUSE-014",
+            "productName": "Logitech Wireless Mouse",
             "quantity": 2,
-            "price": 20
+            "price": 29.99
         }
-    ]
+    ],
+    "total": 859.97
+}
+
+### List all submitted orders
+GET /orders
+Host: localhost:3000
+
+### Get a single order by id
+GET /orders/1001
+Host: localhost:3000
+
+### Update an order status
+PATCH /orders/1001
+Host: localhost:3000
+Content-Type: application/json
+
+{
+    "status": "processing"
 }

@@ -1,7 +1,7 @@
 {
   "name": "order-service",
   "version": "1.0.0",
-  "description": "This project was bootstrapped with Fastify-CLI.",
+  "description": "Best Buy-inspired electronics order service for the CST8915 final project.",
   "main": "app.js",
   "scripts": {
     "test": "echo \"No tests available\"",
