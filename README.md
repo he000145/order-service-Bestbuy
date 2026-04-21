@@ -140,7 +140,7 @@ Run the API container:
 docker run -p 3000:3000 --name order-service-bestbuy order-service-bestbuy
 ```
 
-If you want a local RabbitMQ instance for queue-based demos, a `docker-compose.yml` file is included:
+If you want a local RabbitMQ instance for queue-based demos,  a `docker-compose.yml` file is included:
 
 ```bash
 docker compose up
