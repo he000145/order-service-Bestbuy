@@ -51,12 +51,15 @@ Example request body:
 Returns `201 Created` with the stored order object.
 
 ### `GET /orders`
+
 Return all submitted orders currently held in memory.
 
 ### `GET /orders/:id`
+
 Return a single order by id.
 
 ### `PATCH /orders/:id`
+
 Update an order status.
 
 Example request body:
@@ -68,6 +71,7 @@ Example request body:
 ```
 
 ### `GET /health`
+
 Basic health endpoint. Returns service status and app version.
 
 ## Configuration
